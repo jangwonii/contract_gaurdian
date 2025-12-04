@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from backend.domain.models import Clause
 from backend.infrastructure.llm.base import LLMProvider
@@ -22,6 +22,7 @@ class LLMAgent:
                     result = await self.provider.analyze_clause(clause.raw_text)
                     clause.summary = result.get("summary") or clause.summary
                     clause.category = result.get("category") or clause.category
+                    clause.reasoning = result.get("reasoning") or clause.reasoning
                     risk_data.append(
                         {
                             "risk_reason": result.get("risk_reason") or "",
@@ -38,6 +39,22 @@ class LLMAgent:
                 self.logger.warning("LLM provider failed, using fallback summary: %s", exc)
                 clause.summary = clause.summary or "[LLM error] 요약 불가"
                 clause.category = clause.category or "general"
+                clause.reasoning = clause.reasoning or "LLM unavailable"
                 hint = f"LLM unavailable: {exc}"
             risk_data.append({"risk_reason": hint, "risk_score": None, "risk_level": None})
         return clauses, risk_data
+
+    async def infer_contract_type(self, clauses: List[Clause]) -> Optional[str]:
+        try:
+            if hasattr(self.provider, "infer_contract_type"):
+                return await self.provider.infer_contract_type(clauses)
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("LLM contract type inference failed: %s", exc)
+        # Heuristic fallback
+        categories = [c.category or "" for c in clauses]
+        text = " ".join([c.raw_text for c in clauses])
+        if any(cat in {"employment", "responsibility", "termination"} for cat in categories) or "급여" in text:
+            return "employment"
+        if any(cat in {"lease"} for cat in categories) or "보증금" in text:
+            return "lease"
+        return None

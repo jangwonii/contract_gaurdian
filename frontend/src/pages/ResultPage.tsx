@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ClauseList from "../components/ClauseList";
-import { downloadReport, fetchResult } from "../api/client";
-import type { AnalysisResult } from "../types";
+import { downloadReport, fetchResult, fetchStatus } from "../api/client";
+import type { AnalysisResult, DocumentStatus } from "../types";
 
 type Props = {
   documentId: string | null;
@@ -27,16 +27,31 @@ const ResultPage = ({ documentId, initialResult = null, isAnalyzing = false }: P
   const [error, setError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [downloading, setDownloading] = useState(false);
+  const [status, setStatus] = useState<DocumentStatus | null>(null);
 
   useEffect(() => {
-    if (!documentId || isAnalyzing) return;
-    setLoading(true);
-    setError(null);
-    fetchResult(documentId)
-      .then(setResult)
-      .catch(() => setError("결과를 불러오지 못했습니다. 잠시 후 다시 시도하세요."))
-      .finally(() => setLoading(false));
-  }, [documentId]);
+    let timer: number | null = null;
+    if (documentId && isAnalyzing) {
+      const poll = () => {
+        fetchStatus(documentId)
+          .then((s) => setStatus(s))
+          .catch(() => null);
+      };
+      poll();
+      timer = window.setInterval(poll, 1200);
+    }
+    if (documentId && !isAnalyzing) {
+      setLoading(true);
+      setError(null);
+      fetchResult(documentId)
+        .then(setResult)
+        .catch(() => setError("결과를 불러오지 못했습니다. 잠시 후 다시 시도하세요."))
+        .finally(() => setLoading(false));
+    }
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [documentId, isAnalyzing]);
 
   if (!documentId) {
     return (
@@ -52,6 +67,23 @@ const ResultPage = ({ documentId, initialResult = null, isAnalyzing = false }: P
       <section className="card result-card">
         <h2>2. 분석 결과</h2>
         <p className="muted">분석 중입니다... 잠시만 기다려주세요.</p>
+        <div className="stage-list">
+          {[
+            { key: "extract", label: "문서 텍스트 추출 중..." },
+            { key: "split", label: "조항 구조 파악 중..." },
+            { key: "llm", label: "위험 패턴 스캔 중..." },
+            { key: "risk", label: "법적 관점에서 평가 중..." },
+            { key: "done", label: "완료" },
+          ].map((st) => {
+            const active = status?.stage === st.key;
+            return (
+              <div key={st.key} className={`stage-item ${active ? "active" : ""}`}>
+                <span className="dot" />
+                <span>{active ? status?.message || st.label : st.label}</span>
+              </div>
+            );
+          })}
+        </div>
         <div className="spinner" aria-label="loading" />
       </section>
     );
@@ -122,6 +154,10 @@ const ResultPage = ({ documentId, initialResult = null, isAnalyzing = false }: P
           <p className="label">조항 개수</p>
           <h3>{result.clauses?.length ?? 0}개</h3>
         </div>
+        <div>
+          <p className="label">유형 추론</p>
+          <p className="muted">Agent 추론: {result.auto_contract_type ?? "미확인"} / 선택: {result.contract_type ?? "general"}</p>
+        </div>
       </div>
 
       <div className="actions" style={{ justifyContent: "space-between" }}>
@@ -134,7 +170,7 @@ const ResultPage = ({ documentId, initialResult = null, isAnalyzing = false }: P
         </select>
       </div>
 
-      <ClauseList clauses={result.clauses ?? []} sortByRisk={sortOrder} />
+      <ClauseList clauses={result.clauses ?? []} sortByRisk={sortOrder} documentId={documentId} />
     </section>
   );
 };

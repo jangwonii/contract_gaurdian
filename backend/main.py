@@ -85,6 +85,9 @@ async def upload_document(file: UploadFile = File(...)):
 class AnalyzePayload(BaseModel):
     contract_type: str = "general"
 
+class ImprovePayload(BaseModel):
+    clause_text: str
+
 
 @app.post("/api/documents/{document_id}/analyze")
 async def analyze_document(document_id: str, payload: AnalyzePayload = Body(default=AnalyzePayload())):
@@ -98,6 +101,11 @@ async def get_result(document_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
     return result
+
+
+@app.get("/api/documents/{document_id}/status")
+async def get_status(document_id: str):
+    return repository.get_status(document_id)
 
 
 @app.get("/api/documents/{document_id}/report")
@@ -128,3 +136,13 @@ async def get_report(document_id: str, format: str = "pdf"):
             media_type="text/markdown",
             headers={"Content-Disposition": "attachment; filename=report.md"},
         )
+
+
+@app.post("/api/documents/{document_id}/clauses/{clause_id}/improve")
+async def improve_clause(document_id: str, clause_id: str, payload: ImprovePayload):
+    # For now, simply return suggestion without persisting
+    try:
+        suggestion = await llm_agent.provider.suggest_improvement(payload.clause_text)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Improvement failed: {exc}") from exc
+    return {"clauseId": clause_id, **suggestion}

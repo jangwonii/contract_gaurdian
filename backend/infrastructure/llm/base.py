@@ -21,3 +21,11 @@ class LLMProvider(ABC):
     @abstractmethod
     async def analyze_risk(self, clause_text: str) -> str:
         raise NotImplementedError
+
+    async def infer_contract_type(self, clauses) -> str | None:
+        """Optional: infer contract type from clauses."""
+        raise NotImplementedError
+
+    async def suggest_improvement(self, clause_text: str) -> dict:
+        """Optional: suggest improved clause text."""
+        raise NotImplementedError

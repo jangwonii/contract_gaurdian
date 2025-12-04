@@ -78,4 +78,19 @@ class DummyLLMProvider(LLMProvider):
             "risk_score": score,
             "risk_level": "high" if score >= 75 else "medium" if score >= 50 else "low",
             "risk_reason": risk_text,
+            "reasoning": f"Detected keywords for category '{category}', risk label inferred from heuristic.",
         }
+
+    async def infer_contract_type(self, clauses) -> str | None:
+        text = " ".join([getattr(c, "raw_text", "") for c in clauses])
+        if "급여" in text or "근로" in text:
+            return "employment"
+        if "보증금" in text or "임대" in text:
+            return "lease"
+        return "general"
+
+    async def suggest_improvement(self, clause_text: str) -> dict:
+        # Simple heuristic rewrite
+        suggestion = clause_text.replace("즉시", "합리적 기간 내에").replace("언제든지", "상호 협의 후")
+        rationale = "일방적 즉시/언제든지 권한을 상호 협의/기간 조건으로 완화"
+        return {"suggestion": suggestion, "rationale": rationale, "risk_delta": -10}

@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 from fastapi import UploadFile
 
-from backend.domain.models import AnalysisResult, Document
+from backend.domain.models import AnalysisResult, Document, DocumentStatus
 
 
 class InMemoryRepository:
@@ -16,6 +16,7 @@ class InMemoryRepository:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.documents: Dict[str, Document] = {}
         self.results: Dict[str, AnalysisResult] = {}
+        self.status: Dict[str, DocumentStatus] = {}
 
     async def store_upload(self, document_id: str, upload_file: UploadFile) -> Document:
         target_path = self.storage_dir / f"{document_id}_{upload_file.filename}"
@@ -43,3 +44,9 @@ class InMemoryRepository:
 
     def get_analysis_result(self, document_id: str) -> Optional[AnalysisResult]:
         return self.results.get(document_id)
+
+    def save_status(self, status: DocumentStatus) -> None:
+        self.status[status.document_id] = status
+
+    def get_status(self, document_id: str) -> DocumentStatus:
+        return self.status.get(document_id, DocumentStatus(document_id=document_id, stage="idle", progress=0))

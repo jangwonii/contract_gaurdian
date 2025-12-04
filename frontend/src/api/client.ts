@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "../types";
+import type { AnalysisResult, DocumentStatus, ClauseImprovement } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -50,4 +50,24 @@ export async function downloadReport(
   const blob = await res.blob();
   const filename = contentType.includes("pdf") ? "report.pdf" : "report.md";
   return { blob, filename, contentType };
+}
+
+export async function fetchStatus(documentId: string): Promise<DocumentStatus> {
+  const res = await fetch(`${API_BASE}/api/documents/${documentId}/status`);
+  if (!res.ok) {
+    throw new Error("상태 조회 실패");
+  }
+  return res.json();
+}
+
+export async function suggestImprovement(documentId: string, clauseId: string, clauseText: string): Promise<ClauseImprovement> {
+  const res = await fetch(`${API_BASE}/api/documents/${documentId}/clauses/${clauseId}/improve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clause_text: clauseText }),
+  });
+  if (!res.ok) {
+    throw new Error("수정안 요청 실패");
+  }
+  return res.json();
 }

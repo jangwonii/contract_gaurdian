@@ -131,6 +131,25 @@ body {
   animation: fadeIn 0.25s ease;
 }
 
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.stage-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+}
+
+.stage-item.active {
+  color: #111827;
+  font-weight: 700;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -433,6 +452,14 @@ body {
   background: #f8fafc;
   color: #475569;
   border: 1px solid #e2e8f0;
+}
+
+.suggestion-box {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 10px;
+  margin-top: 8px;
 }
 
 .result-card.placeholder {

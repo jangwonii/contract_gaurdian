@@ -26,6 +26,14 @@ class Clause(BaseModel):
     summary: Optional[str] = None
     category: Optional[str] = None
     risk: ClauseRisk = Field(default_factory=ClauseRisk)
+    reasoning: Optional[str] = None
+
+
+class DocumentStatus(BaseModel):
+    document_id: str
+    stage: str = "idle"
+    progress: int = 0  # 0-100
+    message: str = ""
 
 
 class AnalysisResult(BaseModel):
@@ -33,6 +41,7 @@ class AnalysisResult(BaseModel):
     clauses: List[Clause] = Field(default_factory=list)
     overall_risk_score: float = 0.0
     contract_type: str = "general"
+    auto_contract_type: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     @property
