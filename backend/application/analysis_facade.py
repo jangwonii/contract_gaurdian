@@ -36,7 +36,7 @@ class AnalysisFacade:
         document = await self.repository.store_upload(document_id, upload_file)
         return document
 
-    async def analyze(self, document_id: str) -> AnalysisResult:
+    async def analyze(self, document_id: str, contract_type: str = "general") -> AnalysisResult:
         document = self.repository.get_document(document_id)
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -48,7 +48,7 @@ class AnalysisFacade:
 
         clauses = self.clause_extractor.build_clauses(text)
         clauses, risk_data = await self.llm_agent.annotate(clauses)
-        result = self.risk_analyzer.analyze(document.id, clauses, risk_data)
+        result = self.risk_analyzer.analyze(document.id, clauses, risk_data, contract_type=contract_type)
         self.repository.save_analysis_result(result)
         return result
 

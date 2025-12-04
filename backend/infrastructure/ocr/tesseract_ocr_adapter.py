@@ -7,11 +7,9 @@ from typing import Optional
 from backend.application.ocr_service import OCRService
 
 try:
-    from PIL import Image  # type: ignore
-    import pytesseract  # type: ignore
+    import easyocr  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency
-    Image = None
-    pytesseract = None
+    easyocr = None
 
 try:
     import pdfplumber  # type: ignore
@@ -25,10 +23,12 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 class TesseractOCRAdapter(OCRService):
-    """OCR adapter that wraps pytesseract; falls back to plain text when missing."""
+    """OCR adapter that wraps EasyOCR; falls back to plain text when missing."""
 
-    def __init__(self, language: str = "kor+eng") -> None:
+    def __init__(self, language: str = "kor+eng", use_gpu: bool = False) -> None:
         self.language = language
+        langs = [lang.strip() for lang in language.split("+") if lang.strip()]
+        self.reader = easyocr.Reader(langs, gpu=use_gpu) if easyocr else None
 
     async def extract_text(self, file_path: Path, content_type: Optional[str] = None) -> str:
         return await asyncio.to_thread(self._extract_sync, file_path, content_type)
@@ -39,15 +39,22 @@ class TesseractOCRAdapter(OCRService):
             text = self._extract_pdf_text(file_path)
             if text:
                 return text
-
-        if pytesseract is None or Image is None:
+        # Use EasyOCR for image-based OCR
+        if self.reader is None:
             try:
                 return file_path.read_text(encoding="utf-8")
             except Exception:
-                return "OCR unavailable: install pytesseract and pillow."
+                return "OCR unavailable: install easyocr, torch, and pillow."
 
-        image = Image.open(file_path)
-        return pytesseract.image_to_string(image, lang=self.language)
+        try:
+            lines = self.reader.readtext(str(file_path), detail=0, paragraph=True)
+            return "\n".join(lines).strip()
+        except Exception:
+            # As a last resort, attempt simple file read for text-like inputs
+            try:
+                return file_path.read_text(encoding="utf-8")
+            except Exception:
+                return "OCR failed: EasyOCR could not process the file."
 
     def _extract_pdf_text(self, file_path: Path) -> str:
         # Prefer PyMuPDF for speed and layout-friendly extraction

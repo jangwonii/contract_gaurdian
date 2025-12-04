@@ -6,11 +6,25 @@ import type { AnalysisResult } from "./types";
 function App() {
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [view, setView] = useState<"upload" | "result">("upload");
 
   const handleAnalyzed = (docId: string, result: AnalysisResult) => {
     setDocumentId(docId);
     setAnalysis(result);
+    setIsAnalyzing(false);
+    setView("result");
   };
+
+  const handleAnalyzing = (docId: string) => {
+    setDocumentId(docId);
+    setAnalysis(null);
+    setIsAnalyzing(true);
+    setView("result");
+  };
+
+  const goToUpload = () => setView("upload");
+  const goToResult = () => setView("result");
 
   return (
     <div className="app-shell">
@@ -28,9 +42,26 @@ function App() {
         </div>
       </header>
 
-      <main className="content-grid">
-        <UploadPage onAnalyzed={handleAnalyzed} />
-        <ResultPage documentId={documentId} initialResult={analysis} />
+      <div className="nav-tabs">
+        <button className={`tab-btn ${view === "upload" ? "active" : ""}`} onClick={goToUpload}>
+          1. 업로드
+        </button>
+        <button className={`tab-btn ${view === "result" ? "active" : ""}`} onClick={goToResult} disabled={!documentId}>
+          2. 분석 결과
+        </button>
+      </div>
+
+      <main className="page-container">
+        {view === "upload" && (
+          <section className="page-panel show">
+            <UploadPage onAnalyzed={handleAnalyzed} onAnalyzing={handleAnalyzing} />
+          </section>
+        )}
+        {view === "result" && (
+          <section className="page-panel show">
+            <ResultPage documentId={documentId} initialResult={analysis} isAnalyzing={isAnalyzing} />
+          </section>
+        )}
       </main>
     </div>
   );

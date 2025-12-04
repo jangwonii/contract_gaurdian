@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import ClauseList from "../components/ClauseList";
-import { fetchResult } from "../api/client";
+import { downloadReport, fetchResult } from "../api/client";
 import type { AnalysisResult } from "../types";
 
 type Props = {
   documentId: string | null;
   initialResult?: AnalysisResult | null;
+  isAnalyzing?: boolean;
 };
 
 const riskLabel = (score: number) => {
@@ -20,13 +21,15 @@ const riskTone = (score: number) => {
   return "badge safe";
 };
 
-const ResultPage = ({ documentId, initialResult = null }: Props) => {
+const ResultPage = ({ documentId, initialResult = null, isAnalyzing = false }: Props) => {
   const [result, setResult] = useState<AnalysisResult | null>(initialResult);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    if (!documentId) return;
+    if (!documentId || isAnalyzing) return;
     setLoading(true);
     setError(null);
     fetchResult(documentId)
@@ -40,6 +43,16 @@ const ResultPage = ({ documentId, initialResult = null }: Props) => {
       <section className="card result-card placeholder">
         <h2>2. 분석 결과</h2>
         <p className="muted">업로드 후 결과가 여기에 표시됩니다.</p>
+      </section>
+    );
+  }
+
+  if (isAnalyzing) {
+    return (
+      <section className="card result-card">
+        <h2>2. 분석 결과</h2>
+        <p className="muted">분석 중입니다... 잠시만 기다려주세요.</p>
+        <div className="spinner" aria-label="loading" />
       </section>
     );
   }
@@ -68,6 +81,24 @@ const ResultPage = ({ documentId, initialResult = null }: Props) => {
 
   const score = Math.round(result.overall_risk_score ?? 0);
 
+  const handleDownload = async () => {
+    if (!documentId) return;
+    setDownloading(true);
+    try {
+      const { blob, filename } = await downloadReport(documentId, "pdf");
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError("보고서 다운로드에 실패했습니다.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <section className="card result-card">
       <div className="card-header">
@@ -84,7 +115,7 @@ const ResultPage = ({ documentId, initialResult = null }: Props) => {
             <span className={riskTone(score)}>{riskLabel(score)}</span>
           </div>
           <div className="meter">
-            <div className="bar" style={{ width: `${score}%` }} />
+            <div className={riskTone(score).replace("badge ", "bar ")} style={{ width: `${score}%` }} />
           </div>
         </div>
         <div>
@@ -93,7 +124,17 @@ const ResultPage = ({ documentId, initialResult = null }: Props) => {
         </div>
       </div>
 
-      <ClauseList clauses={result.clauses ?? []} />
+      <div className="actions" style={{ justifyContent: "space-between" }}>
+        <button className="ghost-btn" onClick={handleDownload} disabled={!documentId || downloading}>
+          {downloading ? "보고서 생성 중..." : "PDF 다운로드"}
+        </button>
+        <select className="select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "desc" | "asc")}>
+          <option value="desc">위험 점수 높은 순</option>
+          <option value="asc">위험 점수 낮은 순</option>
+        </select>
+      </div>
+
+      <ClauseList clauses={result.clauses ?? []} sortByRisk={sortOrder} />
     </section>
   );
 };

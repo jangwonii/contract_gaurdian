@@ -4,14 +4,16 @@ import type { AnalysisResult } from "../types";
 
 type Props = {
   onAnalyzed: (documentId: string, result: AnalysisResult) => void;
+  onAnalyzing: (documentId: string) => void;
 };
 
-const UploadPage = ({ onAnalyzed }: Props) => {
+const UploadPage = ({ onAnalyzed, onAnalyzing }: Props) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "analyzing" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
   const [lastDocumentId, setLastDocumentId] = useState<string | null>(null);
+  const [contractType, setContractType] = useState<string>("general");
 
   const handleSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -32,7 +34,8 @@ const UploadPage = ({ onAnalyzed }: Props) => {
       const { documentId } = await uploadDocument(selectedFile);
       setLastDocumentId(documentId);
       setStatus("analyzing");
-      const result = await triggerAnalysis(documentId);
+      onAnalyzing(documentId);
+      const result = await triggerAnalysis(documentId, contractType);
       onAnalyzed(documentId, result);
       setStatus("done");
     } catch (err) {
@@ -81,6 +84,15 @@ const UploadPage = ({ onAnalyzed }: Props) => {
             <p className="muted">최대 20MB, 개인정보는 가급적 제거해주세요.</p>
           </div>
         )}
+      </div>
+
+      <div>
+        <p className="label">계약 유형</p>
+        <select value={contractType} onChange={(e) => setContractType(e.target.value)} className="select">
+          <option value="general">일반</option>
+          <option value="employment">근로/용역</option>
+          <option value="lease">임대차</option>
+        </select>
       </div>
 
       {error && <div className="error-chip">{error}</div>}

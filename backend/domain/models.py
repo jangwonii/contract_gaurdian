@@ -32,6 +32,7 @@ class AnalysisResult(BaseModel):
     document_id: str
     clauses: List[Clause] = Field(default_factory=list)
     overall_risk_score: float = 0.0
+    contract_type: str = "general"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     @property

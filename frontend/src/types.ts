@@ -17,5 +17,6 @@ export interface AnalysisResult {
   clauses: Clause[];
   overall_risk_score: number;
   overall_risk_level?: string;
+  contract_type?: string;
   created_at?: string;
 }

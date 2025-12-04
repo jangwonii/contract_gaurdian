@@ -3,13 +3,16 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from fastapi.responses import Response, StreamingResponse
 
 from backend.application.analysis_facade import AnalysisFacade
 from backend.application.clause_extractor import ClauseExtractor
 from backend.application.llm_agent import LLMAgent
 from backend.application.risk_analyzer import RiskAnalyzer
+from backend.application.report_builder import render_report_html, render_report_md
 from backend.config import Settings
 from backend.infrastructure.llm.dummy_provider import DummyLLMProvider
 from backend.infrastructure.llm.openai_provider import OpenAILLMProvider
@@ -79,9 +82,13 @@ async def upload_document(file: UploadFile = File(...)):
     return {"documentId": document.id, "filename": document.filename}
 
 
+class AnalyzePayload(BaseModel):
+    contract_type: str = "general"
+
+
 @app.post("/api/documents/{document_id}/analyze")
-async def analyze_document(document_id: str):
-    result = await facade.analyze(document_id)
+async def analyze_document(document_id: str, payload: AnalyzePayload = Body(default=AnalyzePayload())):
+    result = await facade.analyze(document_id, contract_type=payload.contract_type)
     return result
 
 
@@ -91,3 +98,33 @@ async def get_result(document_id: str):
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
     return result
+
+
+@app.get("/api/documents/{document_id}/report")
+async def get_report(document_id: str, format: str = "pdf"):
+    result = await facade.get_result(document_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found")
+
+    fmt = format.lower()
+    md = render_report_md(result)
+    if fmt == "md":
+        return Response(content=md, media_type="text/markdown", headers={"Content-Disposition": "attachment; filename=report.md"})
+
+    # Try to render PDF, otherwise fall back to markdown
+    try:
+        from weasyprint import HTML  # type: ignore
+
+        html = render_report_html(result)
+        pdf_bytes = HTML(string=html).write_pdf()
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=report.pdf"},
+        )
+    except Exception:
+        return Response(
+            content=md,
+            media_type="text/markdown",
+            headers={"Content-Disposition": "attachment; filename=report.md"},
+        )
